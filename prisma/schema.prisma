@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String     @id @default(uuid())
+  name     String
+  email    String     @unique
+  password String
+  roles    UserRole[]
+
+  kodeProvinsi  Int?
+  kodeKabupaten Int?
+
+  provinsiId  Int?
+  kabupatenId Int?
+
+  provinsi  Ref_Wilayah? @relation("UserProvinsi", fields: [provinsiId], references: [id])
+  kabupaten Ref_Wilayah? @relation("UserKabupaten", fields: [kabupatenId], references: [id])
+
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@map("user")
+}
+
+model OtpLog {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("otp_log")
+}
+
+enum RoleScope {
+  GENERAL
+  PROVINSI
+  KABKOTA
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  scope       RoleScope @default(GENERAL)
+
+  users      UserRole[]
+  menuAccess RoleMenuAccess[] // Relasi akses spesifik ke Menu & Permission
+
+  @@map("role")
+}
+
+// Hanya menyimpan Action: "READ", "CREATE", "UPDATE", "DELETE"
+model Permission {
+  id         String           @id @default(uuid())
+  name       String           @unique
+  roleAccess RoleMenuAccess[]
+
+  @@map("permission")
+}
+
+model Menu {
+  id    String  @id @default(uuid())
+  title String
+  path  String
+  icon  String?
+  order Int     @default(0)
+
+  parentId String?
+  parent   Menu?   @relation("SubMenus", fields: [parentId], references: [id], onDelete: SetNull)
+  children Menu[]  @relation("SubMenus")
+
+  roleAccess RoleMenuAccess[] // Relasi siapa dan bisa apa di menu ini
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("menu")
+}
+
+model RoleMenuAccess {
+  id           String @id @default(uuid())
+  roleId       String
+  menuId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  menu       Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  // Memastikan tidak ada duplikasi akses yang sama untuk 1 role di 1 menu
+  @@unique([roleId, menuId, permissionId])
+  @@map("rolemenuaccess")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("userrole")
+}
+
+model Ref_Wilayah {
+  id            Int     @id @default(autoincrement())
+  kode_pro      Int?
+  kode_kab      Int?
+  kode_kec      Int?
+  kode_kel      Int?
+  nama          String? @db.VarChar(255)
+  tingkat       Int?
+  tingkat_label String? @db.VarChar(255)
+
+  usersProv User[] @relation("UserProvinsi")
+  usersKab  User[] @relation("UserKabupaten")
+
+  @@index([kode_pro])
+  @@index([kode_kab])
+  @@map("ref_wilayah")
+}

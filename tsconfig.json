@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
+    "rootDir": "./", // UBAH INI agar bisa membaca folder src dan prisma
+    "outDir": "./dist",
+    "sourceMap": true,
+    "types": ["node"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "src/**/*", 
+    "prisma/**/*" // <--- TAMBAHKAN INI
+  ],
+  "exclude": ["node_modules", "dist"]
+}
