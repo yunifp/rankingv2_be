@@ -8,23 +8,14 @@ datasource db {
 }
 
 model User {
-  id       String     @id @default(uuid())
-  name     String
-  email    String     @unique
-  password String
-  roles    UserRole[]
-
-  kodeProvinsi  Int?
-  kodeKabupaten Int?
-
-  provinsiId  Int?
-  kabupatenId Int?
-
-  provinsi  Ref_Wilayah? @relation("UserProvinsi", fields: [provinsiId], references: [id])
-  kabupaten Ref_Wilayah? @relation("UserKabupaten", fields: [kabupatenId], references: [id])
-
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id        String     @id @default(uuid())
+  name      String
+  email     String     @unique
+  password  String
+  roles     UserRole[]
+  
+  createdAt DateTime   @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updatedAt DateTime   @updatedAt @db.DateTime(0)
 
   @@map("user")
 }
@@ -34,26 +25,19 @@ model OtpLog {
   email     String
   otp       String
   isUsed    Boolean  @default(false)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  expiresAt DateTime @db.DateTime(0)
+  createdAt DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
 
   @@map("otp_log")
 }
 
-enum RoleScope {
-  GENERAL
-  PROVINSI
-  KABKOTA
-}
-
 model Role {
-  id          String    @id @default(uuid())
-  name        String    @unique
+  id          String           @id @default(uuid())
+  name        String           @unique
   description String?
-  scope       RoleScope @default(GENERAL)
-
+  
   users      UserRole[]
-  menuAccess RoleMenuAccess[] // Relasi akses spesifik ke Menu & Permission
+  menuAccess RoleMenuAccess[] 
 
   @@map("role")
 }
@@ -78,10 +62,11 @@ model Menu {
   parent   Menu?   @relation("SubMenus", fields: [parentId], references: [id], onDelete: SetNull)
   children Menu[]  @relation("SubMenus")
 
-  roleAccess RoleMenuAccess[] // Relasi siapa dan bisa apa di menu ini
+  roleAccess RoleMenuAccess[] 
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // KOREKSI DI SINI: Menggunakan Timestamp(0)
+  createdAt DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updatedAt DateTime @updatedAt @db.DateTime(0)
 
   @@map("menu")
 }
@@ -96,7 +81,6 @@ model RoleMenuAccess {
   menu       Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
-  // Memastikan tidak ada duplikasi akses yang sama untuk 1 role di 1 menu
   @@unique([roleId, menuId, permissionId])
   @@map("rolemenuaccess")
 }
@@ -109,22 +93,4 @@ model UserRole {
 
   @@id([userId, roleId])
   @@map("userrole")
-}
-
-model Ref_Wilayah {
-  id            Int     @id @default(autoincrement())
-  kode_pro      Int?
-  kode_kab      Int?
-  kode_kec      Int?
-  kode_kel      Int?
-  nama          String? @db.VarChar(255)
-  tingkat       Int?
-  tingkat_label String? @db.VarChar(255)
-
-  usersProv User[] @relation("UserProvinsi")
-  usersKab  User[] @relation("UserKabupaten")
-
-  @@index([kode_pro])
-  @@index([kode_kab])
-  @@map("ref_wilayah")
 }

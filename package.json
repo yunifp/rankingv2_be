@@ -7,8 +7,6 @@
     "dev": "nodemon src/app.ts",
     "build": "tsc",
     "seed:utama": "ts-node prisma/seed.ts",
-    "seed:dapil": "ts-node prisma/seedDapil.ts",
-    "seed:wilayah": "ts-node prisma/seedWilayah.ts",
     "seed:menu": "ts-node prisma/menuSeed.ts"
   },
   "keywords": [],

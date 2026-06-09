@@ -1,4 +1,4 @@
-import { PrismaClient, RoleScope } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -79,12 +79,11 @@ async function main() {
   const superadminRole = await prisma.role.upsert({
     where: { name: "SUPERADMIN" },
     update: {
-      scope: RoleScope.GENERAL,
+      description: "Akses penuh ke seluruh sistem tanpa batasan",
     },
     create: {
       name: "SUPERADMIN",
       description: "Akses penuh ke seluruh sistem tanpa batasan",
-      scope: RoleScope.GENERAL,
     },
   });
 
@@ -119,13 +118,13 @@ async function main() {
     }
   }
   console.log(
-    "✅ Matriks Akses SUPERADMIN: [READ, CREATE, UPDATE, DELETE] untuk semua menu.",
+    "✅ Matriks Akses SUPERADMIN: [READ, CREATE, UPDATE, DELETE, VISIBILITY] untuk semua menu.",
   );
 
   // 5. BUAT USER SUPERADMIN PERTAMA
   const hashedPassword = await bcrypt.hash("admin123", 10);
   const adminUser = await prisma.user.upsert({
-    where: { email: "superadmin@gmail.com" },
+    where: { email: "admin@gmail.com" },
     update: {
       password: hashedPassword,
     },

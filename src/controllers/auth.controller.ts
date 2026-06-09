@@ -15,7 +15,6 @@ export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    // 1. Cari user beserta Role, Menu, dan Permission-nya
     const user = await prisma.user.findUnique({
       where: { email },
       include: {
@@ -40,32 +39,26 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Email atau Password salah." });
     }
 
-    // 2. Bandingkan password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Email atau Password salah." });
     }
 
-    // Payload untuk token
+    // Payload untuk token (BERSIH DARI WILAYAH)
     const tokenPayload = {
       id: user.id,
       email: user.email,
       roles: user.roles.map((ur: any) => ur.role.name),
-      kodeProvinsi: user.kodeProvinsi,
-      kodeKabupaten: user.kodeKabupaten,
     };
 
-    // 3. Generate Access Token (Umur pendek: 15 Menit)
     const token = jwt.sign(tokenPayload, ACCESS_TOKEN_SECRET, {
-      expiresIn: "15m", // Saya kembalikan ke 15m sesuai komentar Anda, jika mau 1d ganti jadi "1d"
+      expiresIn: "15m",
     });
 
-    // Generate Refresh Token (Umur panjang: 7 Hari)
     const refreshToken = jwt.sign(tokenPayload, REFRESH_TOKEN_SECRET, {
       expiresIn: "7d",
     });
 
-    // 4. Ekstrak dan Gabungkan Hak Akses Menu & Permission
     const menuMap = new Map<string, any>();
 
     user.roles.forEach((ur) => {
@@ -81,43 +74,36 @@ export const login = async (req: Request, res: Response) => {
             icon: menu.icon,
             order: menu.order,
             parentId: menu.parentId,
-            permissions: new Set<string>(), // Menggunakan Set untuk mencegah permission duplikat
+            permissions: new Set<string>(),
           });
         }
-
-        // Tambahkan permission (READ, CREATE, dll) ke dalam menu tersebut
         menuMap.get(menu.id).permissions.add(permissionName);
       });
     });
 
-    // Konversi Map kembali ke Array dan ubah Set menjadi Array biasa
     const accessibleMenus = Array.from(menuMap.values())
       .map((menu) => ({
         ...menu,
         permissions: Array.from(menu.permissions),
       }))
-      .sort((a, b) => a.order - b.order); // Urutkan berdasarkan kolom 'order'
+      .sort((a, b) => a.order - b.order);
 
-    // 5. Susun Object User yang akan dikirim ke Frontend (Harus match dengan Interface User di Frontend)
+    // Object User yang dikirim ke Frontend (BERSIH DARI WILAYAH & SCOPE)
     const userDataResponse = {
       id: user.id,
       name: user.name,
       email: user.email,
-      kodeProvinsi: user.kodeProvinsi,
-      kodeKabupaten: user.kodeKabupaten,
       roles: user.roles.map((ur) => ({
         name: ur.role.name,
-        scope: ur.role.scope,
       })),
       menus: accessibleMenus,
     };
 
-    // 6. Kirim Response
     res.json({
       message: "Login Berhasil",
       token,
       refreshToken,
-      user: userDataResponse, // Kirim object user yang sudah dirapikan
+      user: userDataResponse,
     });
   } catch (error: any) {
     res
@@ -126,9 +112,6 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-// ============================================================================
-// FUNGSI BARU: Generate Token Baru menggunakan Refresh Token
-// ============================================================================
 export const refreshToken = async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
 
@@ -144,8 +127,6 @@ export const refreshToken = async (req: Request, res: Response) => {
         id: decoded.id,
         email: decoded.email,
         roles: decoded.roles,
-        kodeProvinsi: decoded.kodeProvinsi,
-        kodeKabupaten: decoded.kodeKabupaten,
       },
       ACCESS_TOKEN_SECRET,
       { expiresIn: "15m" },
@@ -160,9 +141,6 @@ export const refreshToken = async (req: Request, res: Response) => {
   }
 };
 
-// ============================================================================
-// FUNGSI BARU: Mengecek Status Access Token Aktif/Tidak
-// ============================================================================
 export const checkToken = async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
 
@@ -185,7 +163,6 @@ export const checkToken = async (req: Request, res: Response) => {
   }
 };
 
-
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -196,26 +173,17 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({ where: { email } });
 
-    // Keamanan: Jangan beri tahu jika email tidak terdaftar untuk mencegah User Enumeration
     if (!user) {
       return res.json({ message: "Jika email terdaftar, kode OTP telah dikirim." });
     }
 
-    // Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // Kedaluwarsa dalam 15 menit
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Simpan OTP ke Log
     await prisma.otpLog.create({
-      data: {
-        email,
-        otp,
-        expiresAt,
-        isUsed: false,
-      },
+      data: { email, otp, expiresAt, isUsed: false },
     });
 
-    // Kirim Email
     const mailOptions = {
       from: process.env.SMTP_EMAIL || "admin@sistem.com",
       to: email,
@@ -233,52 +201,16 @@ export const forgotPassword = async (req: Request, res: Response) => {
     };
 
     await transporter.sendMail(mailOptions);
-
     res.json({ message: "Jika email terdaftar, kode OTP telah dikirim." });
   } catch (error: any) {
     res.status(500).json({ message: "Gagal memproses permintaan", error: error.message });
   }
 };
 
-/**
- * 2. Verifikasi OTP (Opsional untuk mengecek validasi sebelum input password baru)
- */
 export const verifyOtp = async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
 
-    const otpRecord = await prisma.otpLog.findFirst({
-      where: {
-        email,
-        otp,
-        isUsed: false,
-        expiresAt: { gt: new Date() }, // Pastikan belum expired
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!otpRecord) {
-      return res.status(400).json({ message: "OTP tidak valid atau sudah kedaluwarsa." });
-    }
-
-    res.json({ success: true, message: "OTP Valid. Silakan masukkan password baru." });
-  } catch (error: any) {
-    res.status(500).json({ message: "Gagal memverifikasi OTP", error: error.message });
-  }
-};
-
-/**
- * 3. Reset Password (Simpan Password Baru)
- */
-export const resetPassword = async (req: Request, res: Response) => {
-  try {
-    const { email, otp, newPassword } = req.body;
-
-    if (!email || !otp || !newPassword) {
-      return res.status(400).json({ message: "Email, OTP, dan Password baru wajib diisi." });
-    }
-
-    // Verifikasi OTP lagi untuk keamanan saat menyimpan
     const otpRecord = await prisma.otpLog.findFirst({
       where: {
         email,
@@ -293,10 +225,36 @@ export const resetPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "OTP tidak valid atau sudah kedaluwarsa." });
     }
 
-    // Hash password baru
+    res.json({ success: true, message: "OTP Valid. Silakan masukkan password baru." });
+  } catch (error: any) {
+    res.status(500).json({ message: "Gagal memverifikasi OTP", error: error.message });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, dan Password baru wajib diisi." });
+    }
+
+    const otpRecord = await prisma.otpLog.findFirst({
+      where: {
+        email,
+        otp,
+        isUsed: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "OTP tidak valid atau sudah kedaluwarsa." });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password dan tandai OTP sebagai terpakai dalam satu transaksi
     await prisma.$transaction([
       prisma.user.update({
         where: { email },

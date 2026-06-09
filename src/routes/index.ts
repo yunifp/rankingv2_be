@@ -4,7 +4,6 @@ import usersRoutes from "./users.routes";
 import roleRoutes from "./role.routes";
 import permissionRoutes from "./permissions.routes";
 import menuRoutes from "./menu.routes";
-import wilayahRoutes from "./wilayah.routes";
 
 const router = Router();
 
@@ -13,6 +12,5 @@ router.use("/users", usersRoutes);
 router.use("/roles", roleRoutes);
 router.use("/permissions", permissionRoutes);
 router.use("/menus", menuRoutes);
-router.use("/wilayah", wilayahRoutes);
 
 export default router;

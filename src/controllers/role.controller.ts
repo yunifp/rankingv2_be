@@ -4,13 +4,6 @@ import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 
-// Constant ID Superadmin (Disimpan sebagai referensi jika dibutuhkan)
-const SUPERADMIN_ID = "d85d5209-18d7-47d7-bf86-38b1545997df";
-
-/**
- * Helper: Mengecek apakah user yang melakukan request adalah Superadmin
- * Membaca langsung dari token JWT agar lebih aman dan akurat
- */
 const checkIsSuperAdmin = (req: Request | any) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) return false;
@@ -30,7 +23,6 @@ const checkIsSuperAdmin = (req: Request | any) => {
   }
 };
 
-// Helper function untuk paginasi
 const getPagination = (page?: string, limit?: string) => {
   const pageNumber = parseInt(page as string) || 1;
   const limitNumber = parseInt(limit as string) || 10;
@@ -38,18 +30,15 @@ const getPagination = (page?: string, limit?: string) => {
   return { skip, take: limitNumber, pageNumber, limitNumber };
 };
 
-/**
- * 1. CREATE ROLE
- */
 export const createRole = async (req: Request, res: Response) => {
   try {
-    const { name, description, scope } = req.body;
+    // BERSIH DARI SCOPE
+    const { name, description } = req.body;
 
     const role = await prisma.role.create({
       data: {
         name: name.toUpperCase(),
         description,
-        scope: scope || "GENERAL",
       },
     });
 
@@ -67,9 +56,6 @@ export const createRole = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * 2A. GET ALL ROLES PAGINATED
- */
 export const getRolesPaginated = async (req: any, res: Response) => {
   try {
     const { skip, take, pageNumber, limitNumber } = getPagination(
@@ -77,10 +63,7 @@ export const getRolesPaginated = async (req: any, res: Response) => {
       req.query.limit as string,
     );
 
-    // Cek apakah user yang login memiliki role SUPERADMIN
     const isRequesterSuperAdmin = checkIsSuperAdmin(req);
-
-    // PENYESUAIAN: Jika bukan superadmin, sembunyikan role SUPERADMIN
     const whereClause = isRequesterSuperAdmin
       ? {}
       : { name: { not: "SUPERADMIN" } };
@@ -90,16 +73,10 @@ export const getRolesPaginated = async (req: any, res: Response) => {
         where: whereClause,
         skip,
         take,
-        include: {
-          menuAccess: true,
-        },
-        orderBy: {
-          name: "asc",
-        },
+        include: { menuAccess: true },
+        orderBy: { name: "asc" },
       }),
-      prisma.role.count({
-        where: whereClause,
-      }),
+      prisma.role.count({ where: whereClause }),
     ]);
 
     res.json({
@@ -117,26 +94,15 @@ export const getRolesPaginated = async (req: any, res: Response) => {
   }
 };
 
-/**
- * 2B. GET ALL ROLES (TANPA PAGINATION)
- * Digunakan untuk kebutuhan dropdown / list
- */
 export const getRolesAll = async (req: any, res: Response) => {
   try {
-    // Cek apakah user yang login memiliki role SUPERADMIN
     const isSuperAdmin = checkIsSuperAdmin(req);
-
-    // PENYESUAIAN: Sembunyikan role SUPERADMIN jika yang request bukan Superadmin
     const whereClause = isSuperAdmin ? {} : { name: { not: "SUPERADMIN" } };
 
     const roles = await prisma.role.findMany({
       where: whereClause,
-      include: {
-        menuAccess: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
+      include: { menuAccess: true },
+      orderBy: { name: "asc" },
     });
 
     res.json({ success: true, data: roles });
@@ -145,22 +111,17 @@ export const getRolesAll = async (req: any, res: Response) => {
   }
 };
 
-/**
- * 3. UPDATE ROLE
- */
 export const updateRole = async (req: any, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { name, description, scope } = req.body;
+    // BERSIH DARI SCOPE
+    const { name, description } = req.body;
 
     const targetRole = await prisma.role.findUnique({ where: { id } });
     if (!targetRole) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Role tidak ditemukan" });
+      return res.status(404).json({ success: false, message: "Role tidak ditemukan" });
     }
 
-    // Proteksi: Admin biasa tidak boleh edit role Superadmin (Pengecekan menggunakan nama agar kebal terhadap UUID berubah)
     if (targetRole.name === "SUPERADMIN") {
       const isSuperAdmin = checkIsSuperAdmin(req);
       if (!isSuperAdmin) {
@@ -176,7 +137,6 @@ export const updateRole = async (req: any, res: Response) => {
       data: {
         name: name?.toUpperCase(),
         description,
-        scope,
       },
     });
 
@@ -190,26 +150,19 @@ export const updateRole = async (req: any, res: Response) => {
   }
 };
 
-/**
- * 4. DELETE ROLE
- */
 export const deleteRole = async (req: any, res: Response) => {
   try {
     const id = req.params.id as string;
 
     const targetRole = await prisma.role.findUnique({ where: { id } });
     if (!targetRole) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Role tidak ditemukan" });
+      return res.status(404).json({ success: false, message: "Role tidak ditemukan" });
     }
 
-    // Proteksi: Role Superadmin bersifat abadi/tidak bisa dihapus oleh siapapun
     if (targetRole.name === "SUPERADMIN") {
       return res.status(403).json({
         success: false,
-        message:
-          "Role SUPERADMIN adalah role sistem utama dan tidak dapat dihapus.",
+        message: "Role SUPERADMIN adalah role sistem utama dan tidak dapat dihapus.",
       });
     }
 
@@ -220,9 +173,6 @@ export const deleteRole = async (req: any, res: Response) => {
   }
 };
 
-/**
- * 5. UPDATE ROLE ACCESS (Matriks Permission)
- */
 export const updateRoleAccess = async (req: any, res: Response) => {
   try {
     const roleId = req.params.id as string;
