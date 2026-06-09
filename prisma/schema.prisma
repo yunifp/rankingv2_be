@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// AUTH & RBAC (EXISTING)
+// ==========================================
+
 model User {
   id        String     @id @default(uuid())
   name      String
@@ -52,11 +56,11 @@ model Permission {
 }
 
 model Menu {
-  id    String  @id @default(uuid())
-  title String
-  path  String
-  icon  String?
-  order Int     @default(0)
+  id       String  @id @default(uuid())
+  title    String
+  path     String
+  icon     String?
+  order    Int     @default(0)
 
   parentId String?
   parent   Menu?   @relation("SubMenus", fields: [parentId], references: [id], onDelete: SetNull)
@@ -64,7 +68,6 @@ model Menu {
 
   roleAccess RoleMenuAccess[] 
 
-  // KOREKSI DI SINI: Menggunakan Timestamp(0)
   createdAt DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
   updatedAt DateTime @updatedAt @db.DateTime(0)
 
@@ -93,4 +96,165 @@ model UserRole {
 
   @@id([userId, roleId])
   @@map("userrole")
+}
+
+
+// ==========================================
+// ENUMS PERANKINGAN
+// ==========================================
+
+enum TipeKriteria {
+  benefit
+  cost
+}
+
+enum StatusKluster {
+  Afirmasi
+  Reguler
+}
+
+enum StatusKelulusan {
+  Diproses
+  Menunggu_Tes_Akademik
+  Diterima
+  Ditolak
+  Mengundurkan_Diri
+}
+
+enum FaseDiterima {
+  Afirmasi
+  Reguler
+}
+
+// ==========================================
+// MASTER DATA PERANKINGAN
+// ==========================================
+
+model RefPerguruanTinggi {
+  id_pt                  String   @id @default(uuid())
+  nama_pt                String
+  nama_pt_odoo           String?
+  kode_pt                String?
+  singkatan              String?
+  jenis                  String?
+  alamat                 String?  @db.Text
+  kota                   String?
+  kode_pos               String?
+  no_telepon_pt          String?
+  fax_pt                 String?
+  email                  String?
+  website                String?
+  logo_path              String?
+  nama_pimpinan          String?
+  jabatan_pimpinan       String?
+  no_telepon_pimpinan    String?
+  no_rekening            String?
+  nama_bank              String?
+  nama_penerima_transfer String?
+  npwp                   String?
+  status_aktif           Boolean  @default(true)
+  has_pengajuan_perubahan Boolean @default(false)
+
+  // Relasi
+  prodi                  RefProgramStudi[]
+
+  @@map("ref_perguruan_tinggi")
+}
+
+model RefProgramStudi {
+  id_prodi         String  @id @default(uuid())
+  id_pt            String
+  jenjang          String
+  nama_prodi       String
+  kuota            Int
+  boleh_buta_warna Boolean @default(true)
+
+  // Relasi
+  pt               RefPerguruanTinggi @relation(fields: [id_pt], references: [id_pt], onDelete: Cascade)
+  pelamar_diterima Pelamar[]          @relation("ProdiDiterima")
+  pelamar_pilihan  PelamarPilihan[]
+
+  @@map("ref_program_studi")
+}
+
+model RefKriteria {
+  kode_kriteria String       @id @db.VarChar(10)
+  nama_kriteria String       @db.VarChar(100)
+  tipe          TipeKriteria
+  bobot         Decimal      @db.Decimal(3, 2)
+  kluster       StatusKluster 
+
+  @@map("ref_kriteria")
+}
+
+model RefPenghasilanOrtu {
+  id                  String   @id @default(uuid())
+  rentang_penghasilan String   // Contoh: "< Rp 1.000.000"
+  poin                Int      // Skala nilai untuk SPK SAW (misal: 1 - 5)
+  is_active           Boolean  @default(true)
+  
+  createdAt DateTime @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updatedAt DateTime @updatedAt @db.DateTime(0)
+
+  // Relasi
+  pelamar             Pelamar[]
+
+  @@map("ref_penghasilan_ortu")
+}
+
+// ==========================================
+// TRANSACTIONAL DATA PERANKINGAN
+// ==========================================
+
+model Pelamar {
+  id                   String           @id @default(uuid())
+  kode_pendaftar       String           @unique
+  nama                 String
+  status_kluster       StatusKluster
+  nilai_wawancara      Float            @default(0)
+  nilai_tes_akademik   Float            @default(0)
+  nilai_rapor          Float            @default(0)
+  is_buta_warna        Boolean          @default(false) 
+  
+  id_penghasilan_ortu  String
+  id_prodi_diterima    String?
+  fase_diterima        FaseDiterima?
+  status_kelulusan     StatusKelulusan  @default(Diproses)
+  
+  createdAt DateTime   @default(dbgenerated("CURRENT_TIMESTAMP")) @db.Timestamp(0)
+  updatedAt DateTime   @updatedAt @db.DateTime(0)
+
+  // Relasi
+  penghasilan_ortu     RefPenghasilanOrtu @relation(fields: [id_penghasilan_ortu], references: [id])
+  prodi_diterima       RefProgramStudi?   @relation("ProdiDiterima", fields: [id_prodi_diterima], references: [id_prodi])
+  pilihan_prodi        PelamarPilihan[]
+  ranking              RankDatabase?
+
+  @@map("pelamar")
+}
+
+model PelamarPilihan {
+  id         String @id @default(uuid())
+  id_pelamar String
+  id_prodi   String
+  prioritas  Int    // 1 sampai 42
+
+  // Relasi
+  pelamar    Pelamar          @relation(fields: [id_pelamar], references: [id], onDelete: Cascade)
+  prodi      RefProgramStudi  @relation(fields: [id_prodi], references: [id_prodi], onDelete: Cascade)
+
+  @@unique([id_pelamar, prioritas]) 
+  @@map("pelamar_pilihan")
+}
+
+model RankDatabase {
+  id           String @id @default(uuid())
+  id_pelamar   String @unique
+  skor_afirmasi Float @default(0) 
+  skor_reguler  Float @default(0) 
+
+  // Relasi
+  pelamar      Pelamar @relation(fields: [id_pelamar], references: [id], onDelete: Cascade)
+
+  @@map("rank_database")
 }
