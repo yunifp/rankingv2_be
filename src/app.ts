@@ -6,6 +6,8 @@ import dotenv from "dotenv";
 import path from "path";
 
 import routes from "./routes";
+// 1. IMPORT KONEKSI MONGO
+import { connectMongo } from "./config/mongo"; 
 
 dotenv.config();
 
@@ -47,6 +49,7 @@ app.get("/", (req: Request, res: Response) => {
 // Daftarkan semua rute API di bawah prefix '/api'
 app.use("/api", routes);
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 // ==========================================
 // 3. GLOBAL ERROR HANDLER
 // ==========================================
@@ -65,9 +68,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // ==========================================
-// 4. START SERVER
+// 4. START SERVER & DATABASE
 // ==========================================
 const PORT = process.env.PORT || 8000;
+
+  connectMongo();
 
 app.listen(PORT, () => {
   console.log(`=================================`);

@@ -2,6 +2,10 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
+// ==========================================
+// 1. DISK STORAGE (UNTUK UPLOAD GAMBAR LOKAL)
+// ==========================================
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = './uploads/parpol';
@@ -59,4 +63,27 @@ const storageCalon = multer.diskStorage({
 export const uploadFotoCalon = multer({ 
   storage: storageCalon,
   limits: { fileSize: 2 * 1024 * 1024 }
+});
+
+
+// ==========================================
+// 2. MEMORY STORAGE (UNTUK UPLOAD EXCEL KE S3)
+// ==========================================
+
+const memoryStorage = multer.memoryStorage();
+
+export const uploadExcel = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limit 10MB
+  fileFilter: (req, file, cb) => {
+    // Validasi tipe mime untuk Excel (.xlsx, .xls)
+    if (
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+      file.mimetype === 'application/vnd.ms-excel'
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error('Hanya menerima file Excel (.xlsx / .xls)!'));
+    }
+  }
 });
