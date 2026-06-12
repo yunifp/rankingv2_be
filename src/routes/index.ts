@@ -11,6 +11,7 @@ import kriteriaRoutes from "./kriteria.routes";
 import pelamarRoutes from "./pelamar.routes";
 // 1. Tambahkan import ranking routes
 import rankingRoutes from "./ranking.routes"; 
+import dashboardRoutes from "./dashboard.routes";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.use("/program-studi", prodiRoutes);
 router.use("/kriteria", kriteriaRoutes);
 router.use("/penghasilan-ortu", penghasilanRoutes);
 router.use("/pelamar", pelamarRoutes);  
-// 2. Daftarkan path ranking
+router.use("/dashboard", dashboardRoutes);
 router.use("/ranking", rankingRoutes);
 
 export default router;
